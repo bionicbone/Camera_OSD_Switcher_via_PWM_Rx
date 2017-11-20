@@ -1,0 +1,9 @@
+<WCH v="2">
+  <item n="GP0_bit" r="0" s="False" e="False" i="220"/>
+  <item n="GP1_bit" r="0" s="False" e="False" i="219"/>
+  <item n="GP2_bit" r="0" s="False" e="False" i="218"/>
+  <item n="GP3_bit" r="0" s="False" e="False" i="217"/>
+  <item n="GP4_bit" r="0" s="False" e="False" i="216"/>
+  <item n="GP5_bit" r="0" s="False" e="False" i="215"/>
+  <item n="_counter" r="0" s="True" e="False" i="229"/>
+</WCH>

@@ -1,0 +1,15 @@
+main
+	fail_safe
+interrupt
+	Int2Double
+		NRM3232
+			RES032
+			SETFUN32
+			FIXSIGN32
+	Mul_32x32_FP
+		RES032
+		SETFOV32
+		SETFUN32
+	Double2Int
+		SETIOV3224
+	fail_safe

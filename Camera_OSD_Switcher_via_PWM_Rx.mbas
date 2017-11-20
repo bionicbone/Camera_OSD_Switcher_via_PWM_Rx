@@ -1,0 +1,269 @@
+program Camera_OSD_Switcher_via_PWM_Rx
+
+'*****************************************************************************
+' Program: Camera and OSD controller for Camera Drone
+' Date:                   Nov 2017
+' Developer:              Kevin Guest (TheBionicBone)
+' Version:                v1
+' Status                  Production -    Dev, Build, Test, Production
+' Dev Environment:        MikroBasic Pro for PIC v7.1.0
+' MCU:                    PIC 12F683
+' OSC:                    INTOSCIO  - Important to enable GP5 as GPIO
+' FRQ:                    4 MHz (internal) - Important MHz
+' WDT, PUT, MCLR          Disabled
+' BOD, IES, FSC           Enabled
+'*****************************************************************************
+' Program Details:
+' Program is designed to enable the pilot to switch camera feeds and whether
+' the OSD should be overlaid or not from the Tx.
+'
+' To operate an Rx PWM signal should be presented to GP3 pin, the result
+' will cause the follow GPIO pins to change to high based on the Rx Signal.
+' GP0 High  Lost Contact - Fail Safe  - GP1 and GP5 go high also
+' GP1 High <=1500us                   - FPV Camera connected to VTx
+' GP2 High >1500us                    - Filming Camera connected to VTx
+' GP4 High >1250us and <1750us        - OSD looped out but camera connected to VTx
+' GP5 High <=1250us or >=1750us       - OSD with selected Camera connected to VTx
+'
+' Example Tx Settings:
+' 1125us = FPV with OSD
+' 1375us = FPV without OSD
+' 1625us = GoPro without OSD
+' 1875us = GoPro with OSD
+
+
+' Declarations section 
+  Dim i as Char                  'Temp For/Next Variable + others
+  Dim RC_Pulse as Integer        'RC Pulse length counter
+  Dim counter as Integer         'Pause delay counter for fail safe
+  
+' This procedure is not required for the operation of this program, as such
+ ' the MikroBASIC Pro compiler is intelligent enough not to compile it.
+ ' It has been left in as it forms part of my "Useful Debug Functions" suite.
+ Sub Procedure DisplayValueLED(Dim P1 as Word, Dim ByRef OutputPort1 as
+               byte, Dim OutputBit1 as Byte)
+ ' This procedure will do two things:-
+ ' Using the code line DisplayValueLED(999,GPIO,0) will causes the LED on GP0
+ ' to flash on and off repeatedly 60 times (about 3 seconds), this is useful if
+ ' you need to check if a particular piece of code is executing and when it
+ ' actually executes.
+ ' Also, DisplayValueLED(xxxx, GPIO, 1) where xxxx is a numeric value or
+ ' variable will cause the LED on GP1 to flash in a sequence to allow you to
+ ' see what the value is.
+ ' For example DisplayValueLED(435, GPIO, 1) would start with a long flash to
+ ' identify the sequence is starting with 1000's, followed by a quick pulse to
+ ' indicate there are no 1000's. The another long pulse moves us on to 100's,
+ ' followed by 4 shorter pulses to count us to 400. Another Long pluse moves
+ ' us to 10's etc.
+    Dim Temp as Word
+    If P1 = 999 then   'Just flash LEDs, program executed the call instruction.
+       For i = 1 to 60
+           SetBit(OutputPort1,OutputBit1)
+           Delay_ms(25)
+           ClearBit(OutputPort1,OutputBit1)
+           Delay_ms(25)
+       Next i
+    else                       'Display Count of Param P1
+       temp = P1 / 1000
+          SetBit(OutputPort1,OutputBit1)
+          Delay_ms(3000)       'Pulse for start of 1000's indicator
+          ClearBit(OutputPort1,OutputBit1)
+          Delay_ms(250)
+       If temp > 0 then             'Count the 1000's
+          'Count the 1000's
+          for i = 1 to temp
+             SetBit(OutputPort1,OutputBit1)
+             Delay_ms(250)
+             ClearBit(OutputPort1,OutputBit1)
+             Delay_ms(250)
+          Next i
+          Delay_ms(750)
+       Else                          'No 1000's
+             SetBit(OutputPort1,OutputBit1)
+             Delay_ms(75)
+             ClearBit(OutputPort1,OutputBit1)
+             Delay_ms(1000)
+       End if
+       P1 = P1 - (temp * 1000)
+       temp = P1 / 100
+          SetBit(OutputPort1,OutputBit1)          'GP1 to go high.
+          Delay_ms(1000)       'Pulse for start of 100's indicator
+          ClearBit(OutputPort1,OutputBit1)
+          Delay_ms(250)
+       If temp > 0 then             'Count the 100's
+          'Count the 1000's
+          for i = 1 to temp
+             SetBit(OutputPort1,OutputBit1)
+             Delay_ms(250)
+             ClearBit(OutputPort1,OutputBit1)
+             Delay_ms(250)
+          Next i
+          Delay_ms(750)
+       Else                          'No 100's
+             SetBit(OutputPort1,OutputBit1)
+             Delay_ms(75)
+             ClearBit(OutputPort1,OutputBit1)
+             Delay_ms(1000)
+       End if
+       P1 = P1 - (temp * 100)
+       temp = P1 / 10
+          SetBit(OutputPort1,OutputBit1)
+          Delay_ms(1000)       'Pulse for start of 10's indicator
+          ClearBit(OutputPort1,OutputBit1)
+          Delay_ms(250)
+       If temp > 0 then             'Count the 10's
+          'Count the 1000's
+          for i = 1 to temp
+             SetBit(OutputPort1,OutputBit1)
+             Delay_ms(250)
+             ClearBit(OutputPort1,OutputBit1)
+             Delay_ms(250)
+          Next i
+          Delay_ms(750)
+       Else                          'No 10's
+             SetBit(OutputPort1,OutputBit1)
+             Delay_ms(75)
+             ClearBit(OutputPort1,OutputBit1)
+             Delay_ms(1000)
+       End if
+       P1 = P1 - (temp * 10)
+       temp = P1
+          SetBit(OutputPort1,OutputBit1)
+          Delay_ms(1000)       'Pulse for start of 1's indicator
+          ClearBit(OutputPort1,OutputBit1)
+          Delay_ms(250)
+       If temp > 0 then             'Count the 1's
+          'Count the 1000's
+          for i = 1 to temp
+             SetBit(OutputPort1,OutputBit1)
+             Delay_ms(250)
+             ClearBit(OutputPort1,OutputBit1)
+             Delay_ms(250)
+          Next i
+          Delay_ms(750)
+       Else                          'No 1's
+             SetBit(OutputPort1,OutputBit1)
+             Delay_ms(75)
+             ClearBit(OutputPort1,OutputBit1)
+             Delay_ms(1000)
+       End if
+    End if
+ End Sub
+
+Sub Procedure fail_safe()
+  GPIO.B0 = 1
+  GPIO.B5 = 1
+  GPIO.B1 = 1
+  GPIO.B4 = 0
+  GPIO.B2 = 0
+End Sub
+
+Sub Procedure interrupt()
+  If INTCON.GPIF = 1 Then
+
+    RC_Pulse = 0
+    While TestBit(GPIO,3)  = 1
+      RC_Pulse = RC_Pulse + 1
+    Wend
+    ' Pulse Values (tmp) will be equal to:
+    ' 1000us = 69
+    ' 1500us = 105
+    ' 2000us = 141
+    ' Convert temp to approximate micro second value.
+    RC_Pulse = RC_Pulse * 14.2858
+    ' At this stage the value of tmp should
+          
+    ' Set GPIO outputs for the Video and OSD digitsl switch
+    ' GP0 = LED for Testing Value of the RC Pulse
+    ' GP1 = FPV Camera Active
+    ' GP2 = Gimbal Camera Active
+    ' GP3 = Input from RC PWM Channel
+    ' GP4 = OSD Looped Out
+    ' GP5 = OSD Active
+    ' GP1 & GP2 work as a flip flop (one active, one not-active)
+    ' GP4 & GP5 work as a flip flop (one active, one not-active)
+    ' GP1, GP2, GP4, and GP5 will feed into a Digital Switch
+    If RC_Pulse <=1500 then
+      ' FPV camera active, Gimbal camera deactivated.
+      ' For good circuit reasons deactivate first!!
+      GPIO.B2 = 0
+      GPIO.B1 = 1
+    Else
+      ' FPV camera deactivated, Gimbal camera activated.
+      ' For good circuit reasons deactivate first!!
+      GPIO.B1 = 0
+      GPIO.B2 = 1
+    End If
+
+    If RC_Pulse >= 1250 then
+      If RC_Pulse <= 1750 then
+        ' OSD deactivated, OSD Loop Out activated
+        ' For good circuit reasons deactivate first!!
+        GPIO.B5 = 0
+        GPIO.B4 = 1
+      Else
+        ' OSD activated, OSD Loop Out deactivated
+        ' For good circuit reasons deactivate first!!
+        GPIO.B4 = 0
+        GPIO.B5 = 1
+      End If
+    Else
+      ' OSD activated, OSD Loop Out deactivated
+      ' For good circuit reasons deactivate first!!
+      GPIO.B4 = 0
+      GPIO.B5 = 1
+    End If
+
+    ' Uncomment the following two lines to test pulse value
+    'DisplayValueLED(RC_Pulse, GPIO, 0)
+    'DisplayValueLED(999, GPIO, 0)
+    
+    ' Dont let go of the interrupt until we are sure we have a good low pulse
+    ' This could cost me a little time but ensures I get consistant readings
+    ' The counter just checks we have not lost signal from the Tx, if we have
+    ' then we switch on the FPV and OSD circuits assuming AUTO mission
+    ' if the gimbal camera was pointng in the wrong direction we would have
+    ' no control anyway.
+    counter = 0
+    While TestBit(GPIO,3)  = 0
+      inc(counter)
+      If counter >=7000 then ' about 1 second checks
+        fail_safe
+        counter = 0
+      End if
+    Wend
+    While TestBit(GPIO,3) = 1 ' will drop through this if no Rx Signal
+    GPIO.B0 = 0 ' Turn off Fail Safe LED
+    Wend
+    counter = 0
+    While TestBit(GPIO,3)  = 0
+      inc(counter)
+      If counter >=7000 then ' about 1 second checks
+        fail_safe
+        counter = 0
+      End if
+    Wend
+  End if
+End Sub
+ 
+main:
+'   Main program
+ OPTION_REG = %10000111     'GPIO pull ups are disabled and
+                            'the Prescaler is set to 1:256
+
+ CMCON0 = %00000111         'Configure comparitor pins as GPIO
+ ANSEL  = %00000000         'All are digital
+ ADCON0 = %00000000
+ TRISIO = %00000000         'All are Outputs (except B3 which is input only)
+
+ fail_safe()
+
+ ' Activate Interrupt
+ INTCON.GIE = 1             'Activate Global Interrupt Enable
+ INTCON.GPIE = 1            'Activate the Global Periferral Interrupt
+ IOC.IOC3 = 1               'Activate the interrupt for GPIP.B3
+ 
+ ' Loop forever, waiting for the interrupts on change to occur
+ While True
+ Wend
+end.
